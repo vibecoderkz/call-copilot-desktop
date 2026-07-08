@@ -1,0 +1,46 @@
+{
+  "name": "call-copilot-desktop",
+  "version": "0.1.0",
+  "description": "Call Copilot Desktop — реалтайм-ассистент звонков: живой транскрипт, задачи и подсказки",
+  "main": "main.js",
+  "author": "Dias Zhumagaliyev <hello@dias.now> (https://dias.now)",
+  "license": "SEE LICENSE IN LICENSE",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "now.dias.callcopilot",
+    "productName": "Call Copilot",
+    "artifactName": "CallCopilot-${version}-${os}-${arch}.${ext}",
+    "files": ["main.js", "preload.js", "renderer/**"],
+    "publish": [{
+      "provider": "github",
+      "owner": "vibecoderkz",
+      "repo": "call-copilot-desktop",
+      "releaseType": "release"
+    }],
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Микрофон нужен для транскрипции ваших реплик во время звонка."
+      }
+    },
+    "dmg": { "sign": false },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "nsis": { "oneClick": true, "deleteAppDataOnUninstall": false },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility",
+      "maintainer": "Dias Zhumagaliyev <hello@dias.now>"
+    }
+  }
+}
