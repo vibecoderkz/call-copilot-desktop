@@ -1,6 +1,6 @@
 {
   "name": "call-copilot-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Call Copilot Desktop — реалтайм-ассистент звонков: живой транскрипт, задачи и подсказки",
   "main": "main.js",
   "author": "Dias Zhumagaliyev <hello@dias.now> (https://dias.now)",
