@@ -164,7 +164,23 @@ footer a{color:var(--amber)}
 const $=id=>document.getElementById(id);
 const PLATFORM=(window.copilotNative&&window.copilotNative.platform)||'linux';
 const LOOPBACK='__loopback';
-let sid=null, wsAudio=null, wsUi=null, ac=null, streams=[], t0=0, timerIv=null;
+let sid=null, wsAudio=null, wsUi=null, ac=null, streams=[], t0=0, timerIv=null, kaIv=null;
+
+// туннель может тихо рвать WS — переподключаемся, пока сессия жива
+function connectAudio(){
+  if(!sid) return;
+  wsAudio=new WebSocket(`${wsBase()}/ws/audio/${sid}`);
+  wsAudio.binaryType='arraybuffer';
+  wsAudio.onopen=()=>$('dWs').classList.add('on');
+  wsAudio.onclose=e=>{ $('dWs').classList.remove('on');
+    if(sid && e.code!==4404) setTimeout(connectAudio,2000); };
+}
+function connectUi(){
+  if(!sid) return;
+  wsUi=new WebSocket(`${wsBase()}/ws/ui/${sid}`);
+  wsUi.onmessage=e=>handle(JSON.parse(e.data));
+  wsUi.onclose=e=>{ if(sid && e.code!==4404) setTimeout(connectUi,2000); };
+}
 
 $('server').value=localStorage.getItem('server')||'https://copilot.dias.now';
 $('server').onchange=()=>localStorage.setItem('server',base());
@@ -321,12 +337,8 @@ async function start(){
     ac=new AudioContext();
     await ac.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET],{type:'text/javascript'})));
 
-    wsAudio=new WebSocket(`${wsBase()}/ws/audio/${sid}`);
-    wsAudio.binaryType='arraybuffer';
-    wsAudio.onopen=()=>$('dWs').classList.add('on');
-    wsAudio.onclose=()=>$('dWs').classList.remove('on');
-    wsUi=new WebSocket(`${wsBase()}/ws/ui/${sid}`);
-    wsUi.onmessage=e=>handle(JSON.parse(e.data));
+    connectAudio(); connectUi();
+    kaIv=setInterval(()=>{ if(wsAudio&&wsAudio.readyState===1) wsAudio.send(new Uint8Array([9])); },15000);
 
     await tap(mic,0);
     await tap(them,1);
@@ -347,7 +359,7 @@ async function stop(){
   const done=sid; sid=null;
   if(done) await fetch(`${base()}/api/session/${done}/end`,{method:'POST'}).catch(()=>{});
   streams.forEach(s=>s.getTracks().forEach(t=>t.stop())); streams=[];
-  wsAudio?.close(); wsUi?.close(); ac?.close(); clearInterval(timerIv);
+  wsAudio?.close(); wsUi?.close(); ac?.close(); clearInterval(timerIv); clearInterval(kaIv);
   $('stopBtn').style.display='none'; $('startBtn').style.display=''; $('startBtn').disabled=false;
   $('setup').style.display=''; $('main').style.display='none';
   ['dMic','dSys','dWs'].forEach(d=>$(d).classList.remove('on'));
