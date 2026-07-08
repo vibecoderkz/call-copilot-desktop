@@ -13,11 +13,12 @@ function createWindow() {
     height: 880,
     minWidth: 960,
     minHeight: 620,
-    backgroundColor: '#0b0d13',
+    backgroundColor: '#f6f6f4',
     title: 'Call Copilot',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
+      additionalArguments: ['--copilot-version=' + app.getVersion()],
     },
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
