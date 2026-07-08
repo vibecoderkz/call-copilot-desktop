@@ -4,6 +4,7 @@
   "description": "Call Copilot Desktop — реалтайм-ассистент звонков: живой транскрипт, задачи и подсказки",
   "main": "main.js",
   "author": "Dias Zhumagaliyev <hello@dias.now> (https://dias.now)",
+  "homepage": "https://dias.now",
   "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "start": "electron .",
