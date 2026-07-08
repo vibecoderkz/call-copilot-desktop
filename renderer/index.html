@@ -119,6 +119,7 @@ footer a{color:var(--amber)}
   <div class="card">
     <h3>Настройки</h3>
     <div class="row"><label>Сервер</label><input id="server" placeholder="https://copilot.dias.now"></div>
+    <div class="row"><label>Лицензионный ключ</label><input id="licKey" placeholder="cp_…"></div>
     <div class="row"><label>Микрофон (я)</label><select id="micSel"></select></div>
     <div class="row"><label>Звук собеседников</label><select id="sysSel"></select></div>
   </div>
@@ -184,6 +185,8 @@ function connectUi(){
 
 $('server').value=localStorage.getItem('server')||'https://copilot.dias.now';
 $('server').onchange=()=>localStorage.setItem('server',base());
+$('licKey').value=localStorage.getItem('licKey')||'';
+$('licKey').onchange=()=>localStorage.setItem('licKey',$('licKey').value.trim());
 function base(){return $('server').value.trim().replace(/\/+$/,'')}
 function wsBase(){return base().replace(/^http/,'ws')}
 
@@ -323,7 +326,9 @@ async function start(){
   await stopCheck();
   try{
     const r=await fetch(base()+'/api/session',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({title:$('title').value})});
+      body:JSON.stringify({title:$('title').value,key:$('licKey').value.trim()})});
+    if(r.status===402){alert('Нужен действующий лицензионный ключ — впишите его в настройках. Получить: https://copilot.dias.now');
+      $('startBtn').disabled=false;return}
     sid=(await r.json()).id;
 
     const mic=await navigator.mediaDevices.getUserMedia({audio:{
