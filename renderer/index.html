@@ -87,6 +87,9 @@ aside{display:flex;flex-direction:column;gap:14px}
 #macHelp li{margin:6px 0}
 #macHelp a{color:var(--amber)}
 kbd{background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:1px 7px;font:12px JetBrains Mono}
+.meter{flex:1;height:12px;background:var(--bg2);border:1px solid var(--line);border-radius:7px;overflow:hidden;min-width:120px}
+.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--me),var(--amber));transition:width .07s linear}
+.ok{font:600 12px JetBrains Mono;color:hsl(150 70% 45%);min-width:105px}
 @keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes pulse{0%{box-shadow:0 0 0 0 hsl(38 100% 60% / .5)}100%{box-shadow:0 0 0 18px transparent}}
 #hintCard.fresh{animation:pulse 1.2s var(--ease)}
@@ -118,6 +121,17 @@ footer a{color:var(--amber)}
     <div class="row"><label>Сервер</label><input id="server" placeholder="https://copilot.dias.now"></div>
     <div class="row"><label>Микрофон (я)</label><select id="micSel"></select></div>
     <div class="row"><label>Звук собеседников</label><select id="sysSel"></select></div>
+  </div>
+
+  <div class="card">
+    <h3>Проверка звука</h3>
+    <div class="row">
+      <button id="checkBtn">🎚 Проверить устройства</button>
+      <button id="beepBtn" title="Проиграет тон в динамики — полоска «Они» должна дёрнуться">▶ Тест-сигнал</button>
+    </div>
+    <div class="row"><label>Я (микрофон)</label><div class="meter"><i id="meterMe"></i></div><span class="ok" id="okMe"></span></div>
+    <div class="row"><label>Они (система)</label><div class="meter"><i id="meterThem"></i></div><span class="ok" id="okThem"></span></div>
+    <p id="checkNote" style="color:var(--tx-dim);font-size:12px;margin-top:6px"></p>
   </div>
 
   <div class="card" id="macHelp" style="display:none">
@@ -226,9 +240,71 @@ async function getThemStream(){
     echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
 }
 
+// ---------- проверка звука ----------
+let checkCtx=null, checkStreams=[];
+
+function attachMeter(stream, barId, okId){
+  const an=checkCtx.createAnalyser(); an.fftSize=512;
+  checkCtx.createMediaStreamSource(stream).connect(an);
+  const buf=new Float32Array(an.fftSize);
+  let heard=false;
+  (function loop(){
+    if(!checkCtx) { $(barId).style.width='0'; return; }
+    an.getFloatTimeDomainData(buf);
+    let p=0; for(let i=0;i<buf.length;i++){const a=Math.abs(buf[i]); if(a>p)p=a;}
+    $(barId).style.width=Math.min(100, p*280)+'%';
+    if(p>0.02 && !heard){ heard=true; $(okId).textContent='✓ сигнал есть'; }
+    requestAnimationFrame(loop);
+  })();
+}
+
+async function stopCheck(){
+  checkStreams.forEach(s=>s.getTracks().forEach(t=>t.stop())); checkStreams=[];
+  if(checkCtx){ const c=checkCtx; checkCtx=null; await c.close().catch(()=>{}); }
+  $('checkBtn').textContent='🎚 Проверить устройства';
+  $('okMe').textContent=''; $('okThem').textContent=''; $('checkNote').textContent='';
+}
+
+async function toggleCheck(){
+  if(checkCtx){ await stopCheck(); return; }
+  checkCtx=new AudioContext();
+  $('checkBtn').textContent='■ Остановить проверку';
+  $('checkNote').textContent='Скажи что-нибудь — полоска «Я» должна прыгать. Нажми «Тест-сигнал» или включи любое видео — должна прыгать полоска «Они».';
+  try{
+    const mic=await navigator.mediaDevices.getUserMedia({audio:{
+      deviceId:$('micSel').value?{exact:$('micSel').value}:undefined}});
+    checkStreams.push(mic); attachMeter(mic,'meterMe','okMe');
+  }catch(e){ $('okMe').textContent='✗ '+e.message; }
+  const v=$('sysSel').value;
+  if(v===LOOPBACK){
+    $('okThem').textContent='проверится при старте';
+    $('checkNote').textContent+=' Loopback Windows активируется только при начале звонка.';
+  }else{
+    try{
+      const sys=await navigator.mediaDevices.getUserMedia({audio:{deviceId:{exact:v},
+        echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+      checkStreams.push(sys); attachMeter(sys,'meterThem','okThem');
+    }catch(e){ $('okThem').textContent='✗ '+e.message; }
+  }
+}
+
+function beep(){
+  const c=checkCtx||new AudioContext();
+  const o=c.createOscillator(), g=c.createGain();
+  g.gain.setValueAtTime(0.001,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.5,c.currentTime+0.05);
+  g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+1.1);
+  o.frequency.value=520; o.connect(g); g.connect(c.destination);
+  o.start(); o.stop(c.currentTime+1.2);
+  if(c!==checkCtx) o.onended=()=>c.close();
+}
+$('checkBtn').onclick=toggleCheck;
+$('beepBtn').onclick=beep;
+
 // ---------- сессия ----------
 async function start(){
   $('startBtn').disabled=true;
+  await stopCheck();
   try{
     const r=await fetch(base()+'/api/session',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({title:$('title').value})});
