@@ -305,7 +305,8 @@ async function getThemStream(){
   const v=$('sysSel').value;
   if(v===LOOPBACK){
     const disp=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
-    disp.getVideoTracks().forEach(t=>t.stop());
+    // держим видеодорожку живой (enabled=false), иначе на части ОС гаснет и аудио
+    disp.getVideoTracks().forEach(t=>{t.enabled=false});
     if(!disp.getAudioTracks().length) throw new Error('loopback-аудио недоступно');
     return disp;
   }
